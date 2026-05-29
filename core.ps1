@@ -3,7 +3,7 @@
 # ==========================================
 $botToken = $env:BOT_TOKEN
 $global:apiUrl = "https://api.telegram.org/bot$botToken"
-$global:ownerId = $env:TELEGRAM_CHAT_ID
+$global:ownerId = [string]$env:TELEGRAM_CHAT_ID
 $global:groqKey = $env:GROQ_KEY
 
 Write-Host "[INFO] Menginisialisasi Orbot Public Assistant..."
@@ -52,7 +52,7 @@ ATURAN INTERAKSI:
     }
 }
 
-# 3. Registrasi Tombol Menu Publik (14 Menu - Stalk Dihapus)
+# 3. Registrasi Tombol Menu Publik (14 Menu)
 $publicCommands = @(
     @{command="dl"; description="Unduh media (Max 50MB)"}
     @{command="ssweb"; description="Screenshot website full-page"}
@@ -70,7 +70,7 @@ $publicCommands = @(
     @{command="wiki"; description="Ringkasan Wikipedia"}
 )
 $publicPayload = @{ commands = $publicCommands } | ConvertTo-Json -Depth 10
-Invoke-RestMethod -Uri "$global:apiUrl/setMyCommands" -Method Post -ContentType "application/json" -Body $publicPayload | Out-Null
+Invoke-RestMethod -Uri "$global:apiUrl/setMyCommands" -Method Post -ContentType "application/json" -Body $publicPayload -ErrorAction SilentlyContinue | Out-Null
 
 # 4. Registrasi Tombol Menu Khusus Owner (Scope: Chat)
 $ownerCommands = @(
@@ -84,8 +84,11 @@ $ownerCommands = @(
     @{command="ssweb"; description="Screenshot website full-page"}
     @{command="ringkas"; description="Rangkum artikel via AI"}
 )
-$ownerPayload = @{ commands = $ownerCommands; scope = @{ type = "chat"; chat_id = $global:ownerId } } | ConvertTo-Json -Depth 10
-Invoke-RestMethod -Uri "$global:apiUrl/setMyCommands" -Method Post -ContentType "application/json" -Body $ownerPayload -ErrorAction SilentlyContinue | Out-Null
+
+if (-not [string]::IsNullOrWhiteSpace($global:ownerId)) {
+    $ownerPayload = @{ commands = $ownerCommands; scope = @{ type = "chat"; chat_id = $global:ownerId } } | ConvertTo-Json -Depth 10
+    Invoke-RestMethod -Uri "$global:apiUrl/setMyCommands" -Method Post -ContentType "application/json" -Body $ownerPayload -ErrorAction SilentlyContinue | Out-Null
+}
 
 # 5. Load Modul Eksternal
 . ./cmd_owner.ps1
@@ -102,7 +105,7 @@ while ($true) {
             foreach ($update in $updates.result) {
                 $offset = $update.update_id + 1
                 if ($update.message.text) {
-                    $chatId = $update.message.chat.id
+                    $chatId = [string]$update.message.chat.id
                     $text = $update.message.text
                     
                     if ($text.StartsWith("/")) {
