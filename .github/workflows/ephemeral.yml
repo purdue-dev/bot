@@ -39,6 +39,7 @@ jobs:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           GROQ_KEY: ${{ secrets.GROQ_API_KEY }}
           REMOVEBG_KEY: ${{ secrets.REMOVEBG_API_KEY }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           ./core.ps1
           
