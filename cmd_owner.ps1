@@ -6,46 +6,36 @@ function Handle-OwnerCommands {
     param([string]$command, [string]$args, [string]$chatId)
     $handled = $true
     
-    switch ($command) {
-        "/status" {
-            $cpu = (Get-WmiObject win32_processor | Measure-Object -Property LoadPercentage -Average).Average
-            $ram = Get-WmiObject Win32_OperatingSystem
-            $freeRam = [math]::Round($ram.FreePhysicalMemory / 1024, 2)
-            $totalRam = [math]::Round($ram.TotalVisibleMemorySize / 1024, 2)
-            $msg = "📊 **[PUBLIC BOT] SYSTEM STATUS**`n⚙️ CPU Usage: $cpu%`n💾 RAM Free: $freeRam MB / $totalRam MB"
-            Send-Msg -chatId $chatId -text $msg
-        }
-        "/ip" {
-            $tsIP = $env:TAILSCALE_IP
-            $pubIP = (Invoke-RestMethod -Uri "https://api.ipify.org" -ErrorAction SilentlyContinue)
-            $msg = "🌐 **[PUBLIC BOT] NETWORK INFO**`nTailscale IP: `$ $tsIP`nPublic IP: `$ $pubIP"
-            Send-Msg -chatId $chatId -text $msg
-        }
-        "/ps" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Masukkan command."; return $handled }
-            try {
-                $output = Invoke-Expression $args | Out-String
-                Send-Msg -chatId $chatId -text "💻 **PS Output:**`n```text`n$output`n```"
-            } catch {
-                Send-Msg -chatId $chatId -text "❌ **Error:** $($_.Exception.Message)"
-            }
-        }
-        "/cmd" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Masukkan command."; return $handled }
-            $output = cmd.exe /c $args | Out-String
-            Send-Msg -chatId $chatId -text "🖥️ **CMD Output:**`n```text`n$output`n```"
-        }
-        "/fetch" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ File path?"; return $handled }
-            & curl.exe -s -X POST "$global:apiUrl/sendDocument" -F "chat_id=$chatId" -F "document=@$args" | Out-Null
-        }
-        "/kill" {
-            Send-Msg -chatId $chatId -text "💀 **TERMINATING...**"
-            Stop-Process -Id $PID -Force
-        }
-        default {
-            $handled = $false 
-        }
+    if ($command -eq "/status") {
+        $cpu = (Get-WmiObject win32_processor | Measure-Object -Property LoadPercentage -Average).Average
+        $ram = Get-WmiObject Win32_OperatingSystem
+        $freeRam = [math]::Round($ram.FreePhysicalMemory / 1024, 2)
+        $totalRam = [math]::Round($ram.TotalVisibleMemorySize / 1024, 2)
+        Send-Msg -chatId $chatId -text "📊 **SYSTEM STATUS**`n⚙️ CPU: $cpu%`n💾 RAM Free: $freeRam MB"
     }
+    elseif ($command -eq "/ip") {
+        $tsIP = $env:TAILSCALE_IP
+        $pubIP = (Invoke-RestMethod -Uri "https://api.ipify.org")
+        Send-Msg -chatId $chatId -text "🌐 **NETWORK**`nTS IP: $tsIP`nPub IP: $pubIP"
+    }
+    elseif ($command -eq "/ps") {
+        $output = Invoke-Expression $args | Out-String
+        Send-Msg -chatId $chatId -text "💻 **Output:**`n$output"
+    }
+    elseif ($command -eq "/cmd") {
+        $output = cmd.exe /c $args | Out-String
+        Send-Msg -chatId $chatId -text "🖥️ **Output:**`n$output"
+    }
+    elseif ($command -eq "/fetch") {
+        & curl.exe -s -X POST "$global:apiUrl/sendDocument" -F "chat_id=$chatId" -F "document=@$args" | Out-Null
+    }
+    elseif ($command -eq "/kill") {
+        Send-Msg -chatId $chatId -text "💀 **Shutting down...**"
+        Stop-Process -Id $PID -Force
+    }
+    else {
+        $handled = $false
+    }
+    
     return $handled
 }
