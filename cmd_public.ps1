@@ -1,229 +1,103 @@
 # ==========================================
-# cmd_public.ps1 - Public Features Module
+# cmd_public.ps1 - Public Features Module (Revised & Stable)
 # ==========================================
 
 function Handle-PublicCommands {
     param([string]$command, [string]$args, [string]$chatId, $update)
     
-    switch ($command) {
-        "/start", "/help" {
-            $msg = "👋 **Halo! Saya Orbot Public Assistant.**`nBot utilitas otomatis yang berjalan di server Azure 10Gbps.`n`n"
-            $msg += "📚 **PERINTAH TERSEDIA:**`n"
-            $msg += "📥 **/dl [link]** - Unduh media (Max 50MB)`n"
-            $msg += "📸 **/ssweb [link]** - Screenshot web`n"
-            $msg += "🎨 **/stiker** - Buat stiker (Reply gambar)`n"
-            $msg += "✂️ **/rembg** - Hapus background (Reply gambar)`n"
-            $msg += "📝 **/ocr** - Ekstrak teks gambar (Reply gambar)`n"
-            $msg += "🔳 **/qr [teks]** - Buat QR Code`n"
-            $msg += "🔗 **/short [link]** - Singkat URL panjang`n"
-            $msg += "🤖 **/ringkas [teks]** - Rangkum via AI`n"
-            $msg += "🗣️ **/tts [teks]** - Ubah teks jadi suara`n"
-            $msg += "🌐 **/tr [bahasa] [teks]** - Terjemahan instan`n"
-            $msg += "🎭 **/meme** - Asupan meme acak`n"
-            $msg += "🌤️ **/cuaca [kota]** - Info cuaca terkini`n"
-            $msg += "🏓 **/ping** - Cek latensi server`n"
-            $msg += "📚 **/wiki [cari]** - Ringkasan Wikipedia`n`n"
-            $msg += "💡 _Anda juga dapat mengobrol langsung dengan saya tanpa garis miring!_"
-            Send-Msg -chatId $chatId -text $msg
+    if ($command -eq "/start" -or $command -eq "/help") {
+        $msg = "👋 **Halo! Saya Orbot Public Assistant.**`n`n"
+        $msg += "📥 **/dl [link]** - Unduh media`n"
+        $msg += "📸 **/ssweb [link]** - Screenshot web`n"
+        $msg += "🎨 **/stiker** - Buat stiker`n"
+        $msg += "✂️ **/rembg** - Hapus background`n"
+        $msg += "📝 **/ocr** - Ekstrak teks`n"
+        $msg += "🔳 **/qr [teks]** - Buat QR Code`n"
+        $msg += "🔗 **/short [link]** - Singkat URL`n"
+        $msg += "🤖 **/ringkas [teks]** - Rangkum via AI`n"
+        $msg += "🗣️ **/tts [teks]** - Suara`n"
+        $msg += "🌐 **/tr [bahasa] [teks]** - Terjemah`n"
+        $msg += "🎭 **/meme** - Meme acak`n"
+        $msg += "🌤️ **/cuaca [kota]** - Info cuaca`n"
+        $msg += "🏓 **/ping** - Cek latensi`n"
+        $msg += "📚 **/wiki [cari]** - Wiki`n"
+        Send-Msg -chatId $chatId -text $msg
+    }
+    elseif ($command -eq "/ping") {
+        Send-Msg -chatId $chatId -text "🏓 **PONG!** Orbot aktif."
+    }
+    elseif ($command -eq "/dl") {
+        if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Format: `/dl [link]`"; return }
+        Send-Msg -chatId $chatId -text "⏳ **Memproses...**"
+        $tempId = Get-Random -Minimum 100000 -Maximum 999999
+        $outputTemplate = "C:\Windows\Temp\dl_$tempId.%(ext)s"
+        & yt-dlp --no-playlist -f "best[height<=720]" -o "$outputTemplate" "$args" 2>&1 | Out-Null
+        $downloadedFile = Get-Item "C:\Windows\Temp\dl_$tempId.*" -ErrorAction SilentlyContinue
+        if ($downloadedFile) {
+            & curl.exe -s -X POST "$global:apiUrl/sendVideo" -F "chat_id=$chatId" -F "video=@$($downloadedFile.FullName)" | Out-Null
+            Remove-Item $downloadedFile.FullName -Force
         }
-        
-        "/ping" {
-            Send-Msg -chatId $chatId -text "🏓 **PONG!** Orbot Engine merespons."
+    }
+    elseif ($command -eq "/ssweb") {
+        if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Format: `/ssweb [link]`"; return }
+        $tempFile = "C:\Windows\Temp\ss.jpg"
+        Invoke-WebRequest -Uri "https://image.thum.io/get/width/1080/crop/3000/noanimate/$args" -OutFile $tempFile
+        & curl.exe -s -X POST "$global:apiUrl/sendDocument" -F "chat_id=$chatId" -F "document=@$tempFile" | Out-Null
+        Remove-Item $tempFile -Force
+    }
+    elseif ($command -eq "/stiker") {
+        if ($update.message.reply_to_message.photo) {
+            $f = (Invoke-RestMethod -Uri "$global:apiUrl/getFile?file_id=$($update.message.reply_to_message.photo[-1].file_id)").result.file_path
+            Invoke-WebRequest -Uri "https://api.telegram.org/file/bot$($env:BOT_TOKEN)/$f" -OutFile "C:\Windows\Temp\in.jpg"
+            & magick.exe convert "C:\Windows\Temp\in.jpg" -resize 512x512 "C:\Windows\Temp\out.webp"
+            & curl.exe -s -X POST "$global:apiUrl/sendSticker" -F "chat_id=$chatId" -F "sticker=@C:\Windows\Temp\out.webp" | Out-Null
         }
-
-        "/dl" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Format: `/dl [link]`"; return }
-            Send-Msg -chatId $chatId -text "⏳ **Memproses unduhan...**"
-
-            $tempId = Get-Random -Minimum 100000 -Maximum 999999
-            $outputTemplate = "C:\Windows\Temp\dl_$tempId.%(ext)s"
-
-            try {
-                & yt-dlp --no-playlist -f "best[height<=720]" -o "$outputTemplate" "$args" 2>&1 | Out-Null
-                $downloadedFile = Get-Item "C:\Windows\Temp\dl_$tempId.*" -ErrorAction SilentlyContinue
-
-                if (-not $downloadedFile) { Send-Msg -chatId $chatId -text "❌ **Gagal mengambil media.**"; return }
-
-                if (($downloadedFile.Length / 1MB) -gt 49.5) {
-                    Remove-Item $downloadedFile.FullName -Force -ErrorAction SilentlyContinue
-                    Send-Msg -chatId $chatId -text "⚠️ **DOWNLOAD FAILED, FILE TOO LARGE (50MB+)**"
-                    return
-                }
-
-                $filePath = $downloadedFile.FullName
-                & curl.exe -s -X POST "$global:apiUrl/sendVideo" -F "chat_id=$chatId" -F "video=@$filePath" -F "supports_streaming=true" | Out-Null
-                Remove-Item $filePath -Force -ErrorAction SilentlyContinue
-            } catch {
-                Send-Msg -chatId $chatId -text "❌ **Terjadi kesalahan sistem unduhan.**"
-            }
+    }
+    elseif ($command -eq "/rembg") {
+        if ($update.message.reply_to_message.photo) {
+            $f = (Invoke-RestMethod -Uri "$global:apiUrl/getFile?file_id=$($update.message.reply_to_message.photo[-1].file_id)").result.file_path
+            Invoke-WebRequest -Uri "https://api.telegram.org/file/bot$($env:BOT_TOKEN)/$f" -OutFile "C:\Windows\Temp\in.jpg"
+            & curl.exe -s -X POST "https://api.remove.bg/v1.0/removebg" -H "X-Api-Key: $($env:REMOVEBG_KEY)" -F "image_file=@C:\Windows\Temp\in.jpg" -o "C:\Windows\Temp\out.png"
+            & curl.exe -s -X POST "$global:apiUrl/sendDocument" -F "chat_id=$chatId" -F "document=@C:\Windows\Temp\out.png" | Out-Null
         }
-
-        "/ssweb" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Format: `/ssweb [link]`"; return }
-            Send-Msg -chatId $chatId -text "📸 **Mesin sedang merender website, mohon tunggu...**"
-            $targetUrl = $args
-            if (-not $targetUrl.StartsWith("http")) { $targetUrl = "http://$targetUrl" }
-            $tempId = Get-Random -Minimum 10000 -Maximum 99999
-            $tempFile = "C:\Windows\Temp\ss_$tempId.jpg"
-            try {
-                $ssUrl = "https://image.thum.io/get/width/1080/crop/3000/noanimate/$targetUrl"
-                Invoke-WebRequest -Uri $ssUrl -OutFile $tempFile -TimeoutSec 30 -ErrorAction Stop
-                if (Test-Path $tempFile) {
-                    & curl.exe -s -X POST "$global:apiUrl/sendDocument" -F "chat_id=$chatId" -F "document=@$tempFile" -F "caption=📸 **Target:** $targetUrl" | Out-Null
-                    Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-                } else { Send-Msg -chatId $chatId -text "❌ **Gagal menghasilkan gambar dari tautan tersebut.**" }
-            } catch {
-                Send-Msg -chatId $chatId -text "❌ **Situs tidak dapat diakses atau diblokir oleh mesin perender.**"
-                if (Test-Path $tempFile) { Remove-Item $tempFile -Force -ErrorAction SilentlyContinue }
-            }
-        }
-
-        "/stiker" {
-            if (-not $update.message.reply_to_message -or -not $update.message.reply_to_message.photo) {
-                Send-Msg -chatId $chatId -text "⚠️ **Gunakan dengan cara me-reply gambar (dikirim sebagai Photo).**"
-                return
-            }
-            Send-Msg -chatId $chatId -text "🎨 **Sedang mengonversi gambar menjadi stiker...**"
-            $tempInput = "C:\Windows\Temp\in_stk_$chatId.jpg"
-            $tempOutput = "C:\Windows\Temp\out_stk_$chatId.webp"
-            try {
-                $fileId = $update.message.reply_to_message.photo[-1].file_id
-                $fileInfo = Invoke-RestMethod -Uri "$global:apiUrl/getFile?file_id=$fileId" -ErrorAction Stop
-                Invoke-WebRequest -Uri "https://api.telegram.org/file/bot$($env:BOT_TOKEN)/$($fileInfo.result.file_path)" -OutFile $tempInput -ErrorAction Stop
-                & magick.exe convert "$tempInput" -resize 512x512 "$tempOutput" 2>&1 | Out-Null
-                if (Test-Path $tempOutput) {
-                    & curl.exe -s -X POST "$global:apiUrl/sendSticker" -F "chat_id=$chatId" -F "sticker=@$tempOutput" | Out-Null
-                    Remove-Item $tempInput, $tempOutput -Force -ErrorAction SilentlyContinue
-                } else { Send-Msg -chatId $chatId -text "❌ **Gagal mengonversi gambar.**" }
-            } catch {
-                Send-Msg -chatId $chatId -text "❌ **Terjadi kesalahan internal saat memproses stiker.**"
-            }
-        }
-
-        "/rembg" {
-            if (-not $update.message.reply_to_message -or -not $update.message.reply_to_message.photo) {
-                Send-Msg -chatId $chatId -text "⚠️ **Gunakan dengan cara me-reply gambar (dikirim sebagai Photo).**"
-                return
-            }
-            $removeBgKey = $env:REMOVEBG_KEY
-            if (-not $removeBgKey) { Send-Msg -chatId $chatId -text "❌ **Sistem gagal: API Key Remove.bg belum dikonfigurasi.**"; return }
-            Send-Msg -chatId $chatId -text "✂️ **Mesin sedang memotong latar belakang gambar...**"
-            $tempInput = "C:\Windows\Temp\rbg_in_$chatId.jpg"
-            $tempOutput = "C:\Windows\Temp\rbg_out_$chatId.png"
-            try {
-                $fileId = $update.message.reply_to_message.photo[-1].file_id
-                $filePath = (Invoke-RestMethod -Uri "$global:apiUrl/getFile?file_id=$fileId").result.file_path
-                Invoke-WebRequest -Uri "https://api.telegram.org/file/bot$($env:BOT_TOKEN)/$filePath" -OutFile $tempInput
-                & curl.exe -s -X POST "https://api.remove.bg/v1.0/removebg" -H "X-Api-Key: $removeBgKey" -F "image_file=@$tempInput" -F "size=auto" -o "$tempOutput"
-                if (Test-Path $tempOutput) {
-                    & curl.exe -s -X POST "$global:apiUrl/sendDocument" -F "chat_id=$chatId" -F "document=@$tempOutput" -F "caption=✂️ **Background berhasil dihapus.**" | Out-Null
-                } else { Send-Msg -chatId $chatId -text "❌ **Gagal memproses gambar.**" }
-                Remove-Item $tempInput, $tempOutput -Force -ErrorAction SilentlyContinue
-            } catch { Send-Msg -chatId $chatId -text "❌ **Terjadi kesalahan jaringan.**" }
-        }
-
-        "/ocr" {
-            if (-not $update.message.reply_to_message -or -not $update.message.reply_to_message.photo) {
-                Send-Msg -chatId $chatId -text "⚠️ **Gunakan dengan cara me-reply gambar (dikirim sebagai Photo).**"
-                return
-            }
-            Send-Msg -chatId $chatId -text "📝 **Menganalisis dan mengekstrak teks...**"
-            $tempInput = "C:\Windows\Temp\ocr_in_$chatId.jpg"
-            try {
-                $fileId = $update.message.reply_to_message.photo[-1].file_id
-                $filePath = (Invoke-RestMethod -Uri "$global:apiUrl/getFile?file_id=$fileId").result.file_path
-                Invoke-WebRequest -Uri "https://api.telegram.org/file/bot$($env:BOT_TOKEN)/$filePath" -OutFile $tempInput
-                $ocrResponse = & curl.exe -s -X POST "https://api.ocr.space/parse/image" -H "apikey: helloworld" -F "file=@$tempInput" -F "language=eng" -F "isOverlayRequired=false" | ConvertFrom-Json
-                $parsedText = $ocrResponse.ParsedResults[0].ParsedText
-                if ([string]::IsNullOrWhiteSpace($parsedText)) { Send-Msg -chatId $chatId -text "❌ **Tidak ada teks terbaca.**" }
-                else { Send-Msg -chatId $chatId -text "📝 **Hasil Ekstraksi:**`n`n```text`n$parsedText`n```" }
-                Remove-Item $tempInput -Force -ErrorAction SilentlyContinue
-            } catch { Send-Msg -chatId $chatId -text "❌ **Terjadi kesalahan pindaian.**" }
-        }
-
-        "/qr" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Format: `/qr [teks/link]`"; return }
-            $query = [uri]::EscapeDataString($args)
-            $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=$query"
-            & curl.exe -s -X POST "$global:apiUrl/sendPhoto" -F "chat_id=$chatId" -F "photo=$qrUrl" -F "caption=🔳 QR Code berhasil dibuat." | Out-Null
-        }
-
-        "/short" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Format: `/short [link]`"; return }
-            try {
-                $query = [uri]::EscapeDataString($args)
-                $shortLink = Invoke-RestMethod -Uri "https://is.gd/create.php?format=simple&url=$query" -ErrorAction Stop
-                Send-Msg -chatId $chatId -text "🔗 **Link Singkat:** $shortLink"
-            } catch { Send-Msg -chatId $chatId -text "❌ Gagal memendekkan tautan." }
-        }
-
-        "/ringkas" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Format: `/ringkas [teks]`"; return }
-            Send-Msg -chatId $chatId -text "🤖 **Groq AI sedang merangkum teks...**"
-            $systemPrompt = "Kamu adalah AI asisten perangkum. Tugasmu adalah merangkum teks yang diberikan pengguna menjadi poin utama (bullet points) yang padat dan jelas. Jangan bertele-tele."
-            $body = @{ model = "llama3-70b-8192"; messages = @( @{ role = "system"; content = $systemPrompt }, @{ role = "user"; content = $args } ); max_tokens = 500; temperature = 0.5 } | ConvertTo-Json -Depth 10
-            try {
-                $response = Invoke-RestMethod -Uri "https://api.groq.com/openai/v1/chat/completions" -Method Post -Headers @{ "Authorization" = "Bearer $($env:GROQ_KEY)" } -ContentType "application/json" -Body $body
-                Send-Msg -chatId $chatId -text "📑 **Intisari Teks:**`n`n$($response.choices[0].message.content)"
-            } catch { Send-Msg -chatId $chatId -text "❌ **Sistem Groq sedang sibuk.**" }
-        }
-
-        "/tts" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Format: `/tts [teks]`"; return }
-            Send-Msg -chatId $chatId -text "🗣️ **Merekam suara...**"
-            $tempAudio = "C:\Windows\Temp\tts_$chatId.mp3"
-            $safeText = if ($args.Length -gt 200) { $args.Substring(0, 200) } else { $args }
-            $encodedText = [uri]::EscapeDataString($safeText)
-            try {
-                $ttsUrl = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=id&q=$encodedText"
-                Invoke-WebRequest -Uri $ttsUrl -OutFile $tempAudio -ErrorAction Stop
-                if (Test-Path $tempAudio) {
-                    & curl.exe -s -X POST "$global:apiUrl/sendVoice" -F "chat_id=$chatId" -F "voice=@$tempAudio" | Out-Null
-                    Remove-Item $tempAudio -Force -ErrorAction SilentlyContinue
-                } else { Send-Msg -chatId $chatId -text "❌ **Gagal menghasilkan file suara.**" }
-            } catch { Send-Msg -chatId $chatId -text "❌ **Terjadi kesalahan sintesis suara.**" }
-        }
-
-        "/tr" {
-            $parts = $args -split ' ', 2
-            if ($parts.Count -lt 2) { Send-Msg -chatId $chatId -text "⚠️ Format: `/tr [kode_bahasa] [teks]`"; return }
-            $targetLang = $parts[0]
-            $textToTranslate = [uri]::EscapeDataString($parts[1])
-            Send-Msg -chatId $chatId -text "🌐 **Menerjemahkan teks...**"
-            try {
-                $translateUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$targetLang&dt=t&q=$textToTranslate"
-                $response = Invoke-RestMethod -Uri $translateUrl -ErrorAction Stop
-                $translatedText = ""
-                foreach ($sentence in $response[0]) { $translatedText += $sentence[0] }
-                Send-Msg -chatId $chatId -text "🇺🇳 **Hasil ($targetLang):**`n`n```text`n$translatedText`n```"
-            } catch { Send-Msg -chatId $chatId -text "❌ **Gagal menerjemahkan.**" }
-        }
-
-        "/cuaca" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Format: `/cuaca [kota]`"; return }
-            try {
-                $query = [uri]::EscapeDataString($args)
-                $weather = Invoke-RestMethod -Uri "https://wttr.in/${query}?format=j1" -ErrorAction Stop
-                $current = $weather.current_condition[0]
-                $msg = "🌤️ **Cuaca di $args:**`nSuhu: $($current.temp_C)°C`nKondisi: $($current.weatherDesc[0].value)`nKelembapan: $($current.humidity)%"
-                Send-Msg -chatId $chatId -text $msg
-            } catch { Send-Msg -chatId $chatId -text "❌ Kota tidak ditemukan." }
-        }
-
-        "/wiki" {
-            if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Format: `/wiki [pencarian]`"; return }
-            try {
-                $query = [uri]::EscapeDataString($args)
-                $wiki = Invoke-RestMethod -Uri "https://id.wikipedia.org/api/rest_v1/page/summary/$query" -ErrorAction Stop
-                Send-Msg -chatId $chatId -text "📚 **$($wiki.title)**`n`n$($wiki.extract)"
-            } catch { Send-Msg -chatId $chatId -text "❌ Halaman tidak ditemukan." }
-        }
-
-        "/meme" {
-            try {
-                $meme = Invoke-RestMethod -Uri "https://meme-api.com/gimme" -ErrorAction Stop
-                & curl.exe -s -X POST "$global:apiUrl/sendPhoto" -F "chat_id=$chatId" -F "photo=$($meme.url)" -F "caption=🎭 $($meme.title)" | Out-Null
-            } catch { Send-Msg -chatId $chatId -text "❌ Gagal mengambil meme." }
-        }
+    }
+    elseif ($command -eq "/ocr") {
+        $f = (Invoke-RestMethod -Uri "$global:apiUrl/getFile?file_id=$($update.message.reply_to_message.photo[-1].file_id)").result.file_path
+        Invoke-WebRequest -Uri "https://api.telegram.org/file/bot$($env:BOT_TOKEN)/$f" -OutFile "C:\Windows\Temp\ocr.jpg"
+        $ocr = & curl.exe -s -X POST "https://api.ocr.space/parse/image" -H "apikey: helloworld" -F "file=@C:\Windows\Temp\ocr.jpg" | ConvertFrom-Json
+        Send-Msg -chatId $chatId -text "📝 **Teks:** $($ocr.ParsedResults[0].ParsedText)"
+    }
+    elseif ($command -eq "/qr") {
+        & curl.exe -s -X POST "$global:apiUrl/sendPhoto" -F "chat_id=$chatId" -F "photo=https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=$args" | Out-Null
+    }
+    elseif ($command -eq "/short") {
+        $url = Invoke-RestMethod -Uri "https://is.gd/create.php?format=simple&url=$args"
+        Send-Msg -chatId $chatId -text "🔗 $url"
+    }
+    elseif ($command -eq "/ringkas") {
+        $body = @{ model = "llama3-70b-8192"; messages = @( @{ role = "user"; content = $args } ) } | ConvertTo-Json
+        $res = Invoke-RestMethod -Uri "https://api.groq.com/openai/v1/chat/completions" -Method Post -Headers @{ "Authorization" = "Bearer $($env:GROQ_KEY)" } -ContentType "application/json" -Body $body
+        Send-Msg -chatId $chatId -text "📑 $($res.choices[0].message.content)"
+    }
+    elseif ($command -eq "/tts") {
+        Invoke-WebRequest -Uri "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=id&q=$([uri]::EscapeDataString($args))" -OutFile "C:\Windows\Temp\tts.mp3"
+        & curl.exe -s -X POST "$global:apiUrl/sendVoice" -F "chat_id=$chatId" -F "voice=@C:\Windows\Temp\tts.mp3" | Out-Null
+    }
+    elseif ($command -eq "/tr") {
+        $p = $args -split ' ', 2
+        $res = Invoke-RestMethod -Uri "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$($p[0])&dt=t&q=$([uri]::EscapeDataString($p[1]))"
+        Send-Msg -chatId $chatId -text "🌐 $($res[0][0][0])"
+    }
+    elseif ($command -eq "/cuaca") {
+        $w = Invoke-RestMethod -Uri "https://wttr.in/$args?format=3"
+        Send-Msg -chatId $chatId -text "🌤️ $w"
+    }
+    elseif ($command -eq "/wiki") {
+        $w = Invoke-RestMethod -Uri "https://id.wikipedia.org/api/rest_v1/page/summary/$([uri]::EscapeDataString($args))"
+        Send-Msg -chatId $chatId -text "📚 **$($w.title)**`n$($w.extract)"
+    }
+    elseif ($command -eq "/meme") {
+        $m = Invoke-RestMethod -Uri "https://meme-api.com/gimme"
+        & curl.exe -s -X POST "$global:apiUrl/sendPhoto" -F "chat_id=$chatId" -F "photo=$($m.url)" | Out-Null
     }
 }
