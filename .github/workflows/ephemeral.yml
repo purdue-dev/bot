@@ -20,7 +20,6 @@ jobs:
 
       - name: Install Core CLI Dependencies
         run: |
-          # Menginstal tools background yang ringan tapi wajib
           choco install yt-dlp ffmpeg imagemagick tailscale -y
 
       - name: Connect to Tailscale Network
@@ -28,7 +27,6 @@ jobs:
           $ts = if (Test-Path "$env:ProgramFiles\Tailscale\tailscale.exe") { "$env:ProgramFiles\Tailscale\tailscale.exe" } else { "${env:ProgramFiles(x86)}\Tailscale\tailscale.exe" }
           echo "TS_PATH=$ts" >> $env:GITHUB_ENV
           
-          # Auth Key wajib diset "Reusable" di panel Tailscale
           & $ts up --authkey="${{ secrets.TAILSCALE_AUTH_KEY }}" --hostname="gh-runner-public-$env:GITHUB_RUN_ID" --accept-routes --unattended --reset
           Start-Sleep -Seconds 10
           
@@ -40,7 +38,7 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           GROQ_KEY: ${{ secrets.GROQ_API_KEY }}
+          REMOVEBG_KEY: ${{ secrets.REMOVEBG_API_KEY }}
         run: |
-          # Mengeksekusi jantung utama bot
           ./core.ps1
           
