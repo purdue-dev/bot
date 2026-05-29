@@ -2,7 +2,7 @@
 # core.ps1 - Main Engine Orbot Public Assistant
 # ==========================================
 $botToken = $env:BOT_TOKEN
-global:apiUrl = "https://api.telegram.org/bot$botToken"
+$global:apiUrl = "https://api.telegram.org/bot$botToken"
 $global:ownerId = $env:TELEGRAM_CHAT_ID
 $global:groqKey = $env:GROQ_KEY
 
